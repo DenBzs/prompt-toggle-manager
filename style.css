@@ -1,0 +1,214 @@
+/* Prompt Multi-Mover */
+
+/* ── Popup layout ── */
+#pmm-popup {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 600px;
+}
+
+.pmm-cols {
+    display: flex;
+    gap: 16px;
+}
+
+.pmm-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pmm-col-title {
+    font-weight: 700;
+    font-size: 13px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, #555);
+}
+
+.pmm-sel {
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--SmartThemeBorderColor, #555);
+    background: var(--SmartThemeBlurTintColor, #2a2a2a);
+    color: var(--SmartThemeBodyColor, #ddd);
+    font-size: 12px;
+}
+
+/* ── List header ── */
+.pmm-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+.pmm-list-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.pmm-sm-btn {
+    padding: 2px 7px;
+    font-size: 11px;
+    border: 1px solid var(--SmartThemeBorderColor, #555);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--SmartThemeBodyColor, #ddd);
+    cursor: pointer;
+    opacity: 0.8;
+}
+.pmm-sm-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+
+/* ── Prompt list ── */
+.pmm-prompt-list {
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.15);
+    max-height: 340px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.pmm-placeholder {
+    padding: 20px;
+    text-align: center;
+    opacity: 0.4;
+    font-size: 12px;
+}
+
+/* ── Source items (checkbox) ── */
+.pmm-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 12px;
+    transition: background 0.1s;
+}
+.pmm-item:last-child { border-bottom: none; }
+.pmm-item:hover { background: rgba(255,255,255,0.05); }
+.pmm-item-checked { background: rgba(120,100,255,0.12) !important; }
+.pmm-disabled { opacity: 0.4; }
+
+.pmm-check {
+    flex-shrink: 0;
+    accent-color: #7a6fff;
+    width: 14px; height: 14px;
+    cursor: pointer;
+}
+
+.pmm-idx {
+    flex-shrink: 0;
+    font-size: 10px;
+    opacity: 0.4;
+    width: 22px;
+    text-align: right;
+}
+
+.pmm-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pmm-id {
+    flex-shrink: 0;
+    font-size: 10px;
+    opacity: 0.35;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Target items ── */
+.pmm-target-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+/* ── Insert slots ── */
+.pmm-slot {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 11px;
+    opacity: 0.4;
+    cursor: pointer;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px dashed rgba(255,255,255,0.07);
+    transition: all 0.1s;
+    color: var(--SmartThemeBodyColor, #ddd);
+}
+.pmm-slot:hover {
+    opacity: 0.9;
+    background: rgba(120,100,255,0.12);
+    color: #a89fff;
+}
+.pmm-slot.selected {
+    opacity: 1;
+    background: rgba(120,100,255,0.25);
+    color: #c0b4ff;
+    font-weight: 600;
+    border-color: rgba(120,100,255,0.4);
+}
+.pmm-slot-icon { font-size: 10px; }
+
+/* ── Actions ── */
+.pmm-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #444);
+}
+
+.pmm-info {
+    font-size: 12px;
+    opacity: 0.55;
+    flex: 1;
+}
+
+.pmm-btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.pmm-action-btn {
+    padding: 7px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+.pmm-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.pmm-action-btn:not(:disabled):hover { opacity: 0.85; }
+.pmm-action-btn:not(:disabled):active { transform: scale(0.97); }
+
+.pmm-copy-btn { background: #4a90d9; color: #fff; }
+.pmm-move-btn { background: #d9724a; color: #fff; }
+
+/* Scrollbar */
+.pmm-prompt-list::-webkit-scrollbar { width: 5px; }
+.pmm-prompt-list::-webkit-scrollbar-track { background: transparent; }
+.pmm-prompt-list::-webkit-scrollbar-thumb {
+    background: var(--SmartThemeBorderColor, #555);
+    border-radius: 3px;
+}
