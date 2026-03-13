@@ -1,7 +1,7 @@
 // Prompt Multi-Mover + Toggle Group Manager
 // Two separate inline-drawers injected into Chat Completion preset panel
 
-const extensionName   = 'prompt-mover-multi';
+const extensionName   = '프롬프트 토글 관리';
 const GLOBAL_DUMMY_ID = 100001;
 const TG_KEY          = extensionName;
 
