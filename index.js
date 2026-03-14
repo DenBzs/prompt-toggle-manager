@@ -120,7 +120,7 @@ function buildGroupCard(g, gi, pn) {
             <span class="ptm-tstate ${effectiveOn?'ptm-ts-on':'ptm-ts-off'}">${effectiveOn?'On':'Off'}</span>
             <button class="ptm-ibtn ptm-tovr ${ovrCls}" data-gi="${gi}" data-ti="${ti}">${ovrLabel}</button>
             <span class="ptm-tname">${name}</span>
-            <select class="ptm-bsel" data-gi="${gi}" data-ti="${ti}" style="width:46px;min-width:46px;max-width:46px">
+            <select class="ptm-bsel" data-gi="${gi}" data-ti="${ti}" style="width:45px;min-width:45px;max-width:45px">
                 <option value="direct" ${isDirect?'selected':''}>동일</option>
                 <option value="invert" ${!isDirect?'selected':''}>반전</option>
             </select>
