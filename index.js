@@ -141,7 +141,7 @@ function buildGroupCard(g, gi, pn) {
     const inToggleReorder = toggleReorderMode === gi;
 
     const rows = g.toggles.map((t, ti) => {
-        const name     = allPrompts.find(p => p.identifier === t.target)?.name || t.target;
+        const name     = allPrompts.find(p => p.identifier === t.target)?.name ?? '';
         const isDirect = t.behavior === 'direct';
         const ovr      = t.override ?? null;
         const effectiveOn = ovr !== null ? ovr : (isDirect ? g.isOn : !g.isOn);
@@ -277,7 +277,7 @@ async function showAddToggleModal(gi) {
         return `<label style="display:flex;align-items:center;gap:8px;padding:7px 4px;cursor:${ex?'default':'pointer'};opacity:${ex?'0.45':'1'}">
             <input type="checkbox" class="ptm-add-cb" data-i="${idx}" data-id="${p.identifier}" ${ex?'disabled checked':''}
                 style="width:16px;height:16px;accent-color:#7a6fff;flex-shrink:0;cursor:pointer">
-            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name||p.identifier}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name??''}</span>
             ${ex?'<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(120,100,255,.25);color:#a89fff;flex-shrink:0">추가됨</span>':''}
         </label>`;
     }).join('');
@@ -479,7 +479,7 @@ function renderSrcList() {
     const el = document.getElementById('ptm-src-list'); if (!el) return;
     if (!sourceOrderedPrompts.length) { el.innerHTML='<div class="ptm-ph">프롬프트 없음</div>'; return; }
     el.innerHTML = sourceOrderedPrompts.map((e,i) => {
-        const name=e.prompt.name||e.identifier||'Unnamed', chk=selectedSourceIndices.has(i);
+        const name=e.prompt.name??'', chk=selectedSourceIndices.has(i);
         return `<label class="ptm-item${!e.enabled?' ptm-item-off':''}${chk?' ptm-chked':''}">
             <input type="checkbox" class="ptm-chk" data-i="${i}"${chk?' checked':''}><span class="ptm-num">#${i+1}</span>
             <span class="ptm-name">${e.prompt.marker?'[고정] ':''}${name}</span></label>`;
@@ -499,7 +499,7 @@ function renderDstList() {
     const slot = i=>`<div class="ptm-slot${insertPosition===i?' ptm-slot-on':''}" data-slot="${i}">+</div>`;
     if (!targetOrderedPrompts.length) { el.innerHTML=slot(0); el.querySelector('.ptm-slot').addEventListener('click',()=>selectSlot(0)); return; }
     el.innerHTML = slot(0)+targetOrderedPrompts.map((e,i)=>{
-        const name=e.prompt.name||e.identifier||'Unnamed';
+        const name=e.prompt.name??'';
         return `<div class="ptm-ditem${!e.enabled?' ptm-item-off':''}"><span class="ptm-num">#${i+1}</span>
             <span class="ptm-name">${e.prompt.marker?'[고정] ':''}${name}</span></div>${slot(i+1)}`;
     }).join('');
