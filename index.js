@@ -44,7 +44,6 @@ const collapsedGroups = new Set();
 // Reorder mode state — two independent modes
 let groupReorderMode = false;           // group-level ▲▼ arrows
 let toggleReorderMode = null;           // gi of group whose toggles are being reordered (drag&drop)
-let dragState = null;
 
 function getTGStore() {
     if (!extension_settings[TG_KEY]) extension_settings[TG_KEY] = { presets: {} };
@@ -102,18 +101,23 @@ function renderTGGroups() {
     const pn = getCurrentPreset();
     if (!pn) { area.innerHTML = '<div class="ptm-ph">프리셋이 선택되지 않았습니다</div>'; return; }
 
-    // Auto-remove toggles whose identifier no longer exists in the active prompt order
-    // Use a fresh PM call to always get the latest state (avoids stale oai_settings reference)
-    let validIds;
+    // Call setupChatCompletionPromptManager ONCE — extract both validIds and allPrompts.
+    // Previously buildGroupCard called it again for every card (N+1 calls per render).
+    // Now it's always exactly 1 call.
+    let validIds, allPrompts;
     try {
         const pm = setupChatCompletionPromptManager(oai_settings);
-        const order = (pm.serviceSettings?.prompt_order || []).find(o => String(o.character_id) === String(GLOBAL_DUMMY_ID));
-        validIds = new Set((order?.order || []).map(e => e.identifier));
+        const order = (pm.serviceSettings?.prompt_order || [])
+            .find(o => String(o.character_id) === String(GLOBAL_DUMMY_ID));
+        validIds   = new Set((order?.order || []).map(e => e.identifier));
+        allPrompts = pm.serviceSettings?.prompts || [];
     } catch(e) {
         // fallback to cached data
         const livePreset = getLivePresetData(pn) || openai_settings[openai_setting_names[pn]];
-        const order = (livePreset?.prompt_order || []).find(o => String(o.character_id) === String(GLOBAL_DUMMY_ID));
-        validIds = new Set((order?.order || []).map(e => e.identifier));
+        const order = (livePreset?.prompt_order || [])
+            .find(o => String(o.character_id) === String(GLOBAL_DUMMY_ID));
+        validIds   = new Set((order?.order || []).map(e => e.identifier));
+        allPrompts = livePreset?.prompts || [];
     }
     const groups = getGroupsForPreset(pn);
     let changed = false;
@@ -125,18 +129,19 @@ function renderTGGroups() {
     if (changed) saveGroups(pn, groups);
 
     if (!groups.length) { area.innerHTML = '<div class="ptm-ph">그룹이 없습니다</div>'; return; }
-    area.innerHTML = groups.map((g, gi) => buildGroupCard(g, gi, pn)).join('');
+    area.innerHTML = groups.map((g, gi) => buildGroupCard(g, gi, pn, allPrompts)).join('');
     wireGroupCards(area);
 }
 
-function buildGroupCard(g, gi, pn) {
-    let allPrompts;
-    try {
-        const pm = setupChatCompletionPromptManager(oai_settings);
-        allPrompts = pm.serviceSettings?.prompts || [];
-    } catch(e) {
-        const preset = getLivePresetData(pn) || openai_settings[openai_setting_names[pn]];
-        allPrompts = preset?.prompts || [];
+// allPrompts passed in from renderTGGroups — no extra manager call needed.
+// Fallback handles any future direct callers.
+function buildGroupCard(g, gi, pn, allPrompts) {
+    if (!allPrompts) {
+        try {
+            allPrompts = setupChatCompletionPromptManager(oai_settings).serviceSettings?.prompts || [];
+        } catch(e) {
+            allPrompts = (getLivePresetData(pn) || openai_settings[openai_setting_names[pn]])?.prompts || [];
+        }
     }
     const inToggleReorder = toggleReorderMode === gi;
 
@@ -152,13 +157,13 @@ function buildGroupCard(g, gi, pn) {
         else                   { ovrLabel = 'Off'; ovrCls = 'ptm-tovr-off'; }
 
         return `
-        <div class="ptm-trow" ${inToggleReorder?'draggable="true"':''} data-gi="${gi}" data-ti="${ti}">
+        <div class="ptm-trow" ${inToggleReorder ? 'data-draggable="true"' : ''} data-gi="${gi}" data-ti="${ti}">
             ${inToggleReorder
                 ? `<span class="ptm-drag-handle" title="드래그하여 이동">⠿</span>`
-                : `<span class="ptm-tstate ${effectiveOn?'ptm-ts-on':'ptm-ts-off'}">${effectiveOn?'On':'Off'}</span>`}
+                : `<span class="ptm-tstate ${effectiveOn ? 'ptm-ts-on' : 'ptm-ts-off'}">${effectiveOn ? 'On' : 'Off'}</span>`}
             <button class="ptm-ibtn ptm-tovr ${ovrCls}" data-gi="${gi}" data-ti="${ti}">${ovrLabel}</button>
             <span class="ptm-tname">${name}</span>
-            ${!inToggleReorder ? `<button class="ptm-ibtn ptm-bsel ${isDirect?'ptm-bsel-dir':'ptm-bsel-inv'}" data-gi="${gi}" data-ti="${ti}">${isDirect?'동일':'반전'}</button>` : ''}
+            ${!inToggleReorder ? `<button class="ptm-ibtn ptm-bsel ${isDirect ? 'ptm-bsel-dir' : 'ptm-bsel-inv'}" data-gi="${gi}" data-ti="${ti}">${isDirect ? '동일' : '반전'}</button>` : ''}
             <button class="ptm-ibtn ptm-danger ptm-del-toggle" data-gi="${gi}" data-ti="${ti}">✕</button>
         </div>`;
     }).join('');
@@ -166,29 +171,30 @@ function buildGroupCard(g, gi, pn) {
     const collapseKey = `${pn}__${gi}`;
     const isCollapsed = collapsedGroups.has(collapseKey);
     const toggleCount = g.toggles.length;
-    const groups = getGroupsForPreset(pn);
-    const isFirst = gi === 0, isLast = gi === groups.length - 1;
+    const groups      = getGroupsForPreset(pn);
+    const isFirst     = gi === 0;
+    const isLast      = gi === groups.length - 1;
 
     return `
     <div class="ptm-card" data-gi="${gi}">
         <div class="ptm-card-head">
             ${groupReorderMode ? `
-                <button class="ptm-ibtn ptm-grp-up${isFirst?' ptm-arr-disabled':''}" data-gi="${gi}" ${isFirst?'disabled':''}>▲</button>
-                <button class="ptm-ibtn ptm-grp-dn${isLast?' ptm-arr-disabled':''}" data-gi="${gi}" ${isLast?'disabled':''}>▼</button>
-            ` : `<button class="ptm-onoff ${g.isOn?'ptm-onoff-on':'ptm-onoff-off'}" data-gi="${gi}">${g.isOn?'On':'Off'}</button>`}
+                <button class="ptm-ibtn ptm-grp-up${isFirst ? ' ptm-arr-disabled' : ''}" data-gi="${gi}" ${isFirst ? 'disabled' : ''}>▲</button>
+                <button class="ptm-ibtn ptm-grp-dn${isLast  ? ' ptm-arr-disabled' : ''}" data-gi="${gi}" ${isLast  ? 'disabled' : ''}>▼</button>
+            ` : `<button class="ptm-onoff ${g.isOn ? 'ptm-onoff-on' : 'ptm-onoff-off'}" data-gi="${gi}">${g.isOn ? 'On' : 'Off'}</button>`}
             <span class="ptm-gname">${g.name} <span class="ptm-gcnt">(${toggleCount})</span></span>
             <div class="ptm-gbtns">
-                ${!groupReorderMode && !inToggleReorder ? `<button class="ptm-ibtn ptm-ren-grp" data-gi="${gi}">✏️</button>` : ''}
+                ${!groupReorderMode && !inToggleReorder && !isCollapsed ? `<button class="ptm-ibtn ptm-ren-grp" data-gi="${gi}">✏️</button>` : ''}
                 ${!groupReorderMode && !inToggleReorder && !isCollapsed ? `<button class="ptm-ibtn ptm-reorder-grp-btn" data-gi="${gi}" title="토글 순서 변경">⠿</button>` : ''}
                 ${!groupReorderMode && !inToggleReorder ? `<button class="ptm-ibtn ptm-danger ptm-del-grp" data-gi="${gi}">✕</button>` : ''}
                 ${inToggleReorder ? `<button class="ptm-ibtn ptm-toggle-reorder-done" data-gi="${gi}" style="color:#6ddb9e">✓</button>` : ''}
-                <button class="ptm-ibtn ptm-collapse-grp" data-gi="${gi}" data-cpkey="${collapseKey}" title="${isCollapsed?'펼치기':'접기'}">${isCollapsed?'▸':'▾'}</button>
+                <button class="ptm-ibtn ptm-collapse-grp" data-gi="${gi}" data-cpkey="${collapseKey}" title="${isCollapsed ? '펼치기' : '접기'}">${isCollapsed ? '▸' : '▾'}</button>
             </div>
         </div>
-        <div class="ptm-tlist${isCollapsed?' ptm-hidden':''}">
+        <div class="ptm-tlist${isCollapsed ? ' ptm-hidden' : ''}">
             ${rows || '<div class="ptm-ph" style="padding:6px;font-size:11px">토글 없음</div>'}
         </div>
-        ${!groupReorderMode ? `<button class="ptm-sm ptm-sm-full ptm-add-toggle${isCollapsed?' ptm-hidden':''}" data-gi="${gi}">+ 토글 추가</button>` : ''}
+        ${!groupReorderMode ? `<button class="ptm-sm ptm-add-toggle${isCollapsed ? ' ptm-hidden' : ''}" data-gi="${gi}" style="width:calc(100% - 12px);margin:2px 6px;box-sizing:border-box;">+ 토글 추가</button>` : ''}
     </div>`;
 }
 
@@ -264,7 +270,7 @@ function wireGroupCards(area) {
 
 // ── Add toggle modal ──────────────────────────────────────────────
 async function showAddToggleModal(gi) {
-    const pn = getCurrentPreset(), preset = openai_settings[openai_setting_names[pn]];
+    const pn = getCurrentPreset(), preset = getLivePresetData(pn);
     if (!preset) return;
     const gs = getGroupsForPreset(pn), exists = new Set(gs[gi].toggles.map(t => t.target));
     const prompts = preset.prompts || [];
@@ -575,9 +581,9 @@ async function performOperation(isMove) {
         document.getElementById('ptm-gname-row')?.classList.add('ptm-hidden');
         const gi=document.getElementById('ptm-gname');if(gi)gi.value='';
         renderSrcList();renderDstList();updateButtons();
-        // Refresh ST prompt manager UI using now-synced oai_settings
+        // Auto-refresh the ST prompt manager UI without page reload
         try { setupChatCompletionPromptManager(oai_settings).render(); } catch(e){console.warn('[PTM] PM refresh failed',e);}
-    } catch(err){console.error('[PTM]',err);toastr.error('실패: '+err.message);}
+    } catch(err) { console.error('[PTM]', err); toastr.error('실패: '+err.message); }
 }
 
 // Same-preset reorder (move within same preset)
@@ -715,47 +721,114 @@ function wireTGReorder() {
     const area = document.getElementById('ptm-tg-area');
     if (!area) return;
 
-    area.addEventListener('dragstart', e => {
+    // Smooth in-container drag using Pointer Events + CSS transform.
+    // - No ghost element, no document-level listeners, no RAF needed.
+    // - The dragged row slides up/down within its container via translateY.
+    // - Sibling rows smoothly shift out of the way with CSS transition.
+    // - setPointerCapture ensures move/up fire even if pointer leaves the area.
+
+    let drag = null; // { el, gi, fromTi, currentTi, rows, rowH }
+
+    function getRows(gi) {
+        return [...area.querySelectorAll(`.ptm-trow[data-gi="${gi}"][data-draggable="true"]`)];
+    }
+
+    function applyPositions(fromTi, toTi, rows, dragEl, rowH) {
+        rows.forEach((r, i) => {
+            if (r === dragEl) return;
+            let shift = 0;
+            if (fromTi < toTi) {
+                // Dragging down: rows between old↓new shift up by one slot
+                if (i > fromTi && i <= toTi) shift = -rowH;
+            } else {
+                // Dragging up: rows between new↑old shift down by one slot
+                if (i >= toTi && i < fromTi) shift = rowH;
+            }
+            r.style.transition = 'transform 0.12s ease';
+            r.style.transform  = shift ? `translateY(${shift}px)` : '';
+        });
+    }
+
+    function resetStyles(rows) {
+        rows.forEach(r => {
+            r.style.transform  = '';
+            r.style.transition = '';
+            r.style.position   = '';
+            r.style.zIndex     = '';
+            r.style.opacity    = '';
+            r.style.boxShadow  = '';
+        });
+    }
+
+    area.addEventListener('pointerdown', e => {
         if (toggleReorderMode === null) return;
-        const row = e.target.closest('.ptm-trow[draggable]');
-        if (row && +row.dataset.gi === toggleReorderMode) {
-            dragState = { gi: +row.dataset.gi, ti: +row.dataset.ti };
-            e.dataTransfer.effectAllowed = 'move';
-            setTimeout(() => row.classList.add('ptm-dragging'), 0);
+        const handle = e.target.closest('.ptm-drag-handle');
+        if (!handle) return;
+        const row = handle.closest('.ptm-trow[data-draggable="true"]');
+        if (!row || +row.dataset.gi !== toggleReorderMode) return;
+
+        e.preventDefault();
+        const gi   = +row.dataset.gi;
+        const ti   = +row.dataset.ti;
+        const rows = getRows(gi);
+        const rowH = row.offsetHeight;
+
+        // Style the dragged row: lift it above siblings
+        row.style.position  = 'relative';
+        row.style.zIndex    = '10';
+        row.style.opacity   = '0.88';
+        row.style.boxShadow = '0 4px 12px rgba(0,0,0,0.28)';
+        row.style.transition = 'none';
+
+        drag = { el: row, gi, fromTi: ti, currentTi: ti, rows, rowH, startY: e.clientY };
+
+        // Capture pointer so pointermove/pointerup always fire on this element
+        area.setPointerCapture(e.pointerId);
+    });
+
+    area.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const { el, fromTi, currentTi, rows, rowH, startY } = drag;
+        const dy = e.clientY - startY;
+
+        // Clamp vertical movement to the group's list bounds
+        const maxUp   = -(fromTi * rowH);
+        const maxDown = (rows.length - 1 - fromTi) * rowH;
+        const clamped = Math.max(maxUp, Math.min(maxDown, dy));
+        el.style.transform = `translateY(${clamped}px)`;
+
+        // Determine which slot we're hovering over
+        const newTi = Math.max(0, Math.min(rows.length - 1,
+            fromTi + Math.round(dy / rowH)));
+
+        if (newTi !== currentTi) {
+            drag.currentTi = newTi;
+            applyPositions(fromTi, newTi, rows, el, rowH);
         }
     });
 
-    area.addEventListener('dragover', e => {
-        if (toggleReorderMode === null || !dragState) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        area.querySelectorAll('.ptm-drag-over').forEach(el => el.classList.remove('ptm-drag-over'));
-        const row = e.target.closest('.ptm-trow[draggable]');
-        if (row && +row.dataset.gi === dragState.gi && +row.dataset.ti !== dragState.ti) row.classList.add('ptm-drag-over');
-    });
+    function endDrag(e) {
+        if (!drag) return;
+        const { el, gi, fromTi, currentTi, rows } = drag;
+        drag = null;
 
-    area.addEventListener('dragleave', e => {
-        if (!e.currentTarget.contains(e.relatedTarget))
-            area.querySelectorAll('.ptm-drag-over').forEach(el => el.classList.remove('ptm-drag-over'));
-    });
+        // Remove pointer capture
+        try { area.releasePointerCapture(e.pointerId); } catch(_) {}
 
-    area.addEventListener('drop', e => {
-        if (toggleReorderMode === null || !dragState) return;
-        e.preventDefault();
-        const row = e.target.closest('.ptm-trow[draggable]');
-        if (!row || +row.dataset.gi !== dragState.gi || +row.dataset.ti === dragState.ti) { dragState = null; return; }
-        const pn = getCurrentPreset(), gs = getGroupsForPreset(pn);
-        const toggles = gs[dragState.gi].toggles;
-        const [moved] = toggles.splice(dragState.ti, 1);
-        toggles.splice(+row.dataset.ti, 0, moved);
-        saveGroups(pn, gs); renderTGGroups();
-        dragState = null;
-    });
+        resetStyles(rows);
 
-    area.addEventListener('dragend', () => {
-        area.querySelectorAll('.ptm-drag-over, .ptm-dragging').forEach(el => el.classList.remove('ptm-drag-over', 'ptm-dragging'));
-        dragState = null;
-    });
+        if (currentTi !== fromTi) {
+            const pn = getCurrentPreset(), gs = getGroupsForPreset(pn);
+            const toggles = gs[gi].toggles;
+            const [moved] = toggles.splice(fromTi, 1);
+            toggles.splice(currentTi, 0, moved);
+            saveGroups(pn, gs);
+            renderTGGroups();
+        }
+    }
+
+    area.addEventListener('pointerup',     endDrag);
+    area.addEventListener('pointercancel', endDrag);
 }
 
 // ══════════════════════════════════════════
