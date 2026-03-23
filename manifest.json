@@ -1,12 +1,12 @@
 {
-    "display_name": "프롬프트 토글 관리",
+    "display_name": "📋프롬토글관리",
     "loading_order": 10,
     "requires": [],
     "optional": [],
     "js": "index.js",
     "css": "style.css",
     "author": "custom",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "homePage": "https://github.com/DenBzs/prompt-toggle-manager",
     "auto_update": false
 }
